@@ -1,10 +1,15 @@
 const pastes = require("../data/pastes-data");
 
 function list(req, res) {
-  res.json({ data: pastes });
+  const { userId } = req.params;
+  res.json({
+    data: pastes.filter(
+      userId ? (paste) => paste.user_id == userId : () => true
+    ),
+  });
 }
 
-let lastPasteId = pastes.reduce((maxId, paste) => Math.max(maxId, paste.id), 0)
+let lastPasteId = pastes.reduce((maxId, paste) => Math.max(maxId, paste.id), 0);
 
 function bodyDataHas(propertyName) {
   return function (req, res, next) {
@@ -13,8 +18,8 @@ function bodyDataHas(propertyName) {
       return next();
     }
     next({
-        status: 400,
-        message: `Must include a ${propertyName}`
+      status: 400,
+      message: `Must include a ${propertyName}`,
     });
   };
 }
@@ -33,7 +38,15 @@ function exposurePropertyIsValid(req, res, next) {
 
 function syntaxPropertyIsValid(req, res, next) {
   const { data: { syntax } = {} } = req.body;
-  const validSyntax = ["None", "Javascript", "Python", "Ruby", "Perl", "C", "Scheme"];
+  const validSyntax = [
+    "None",
+    "Javascript",
+    "Python",
+    "Ruby",
+    "Perl",
+    "C",
+    "Scheme",
+  ];
   if (validSyntax.includes(syntax)) {
     return next();
   }
@@ -43,13 +56,13 @@ function syntaxPropertyIsValid(req, res, next) {
   });
 }
 
-function expirationIsValidNumber(req, res, next){
-  const { data: { expiration }  = {} } = req.body;
-  if (expiration <= 0 || !Number.isInteger(expiration)){
-      return next({
-          status: 400,
-          message: `Expiration requires a valid number`
-      });
+function expirationIsValidNumber(req, res, next) {
+  const { data: { expiration } = {} } = req.body;
+  if (expiration <= 0 || !Number.isInteger(expiration)) {
+    return next({
+      status: 400,
+      message: `Expiration requires a valid number`,
+    });
   }
   next();
 }
@@ -72,6 +85,7 @@ function pasteExists(req, res, next) {
   const { pasteId } = req.params;
   const foundPaste = pastes.find((paste) => paste.id === Number(pasteId));
   if (foundPaste) {
+    res.locals.paste = foundPaste;
     return next();
   }
   next({
@@ -80,25 +94,22 @@ function pasteExists(req, res, next) {
   });
 }
 
-function read(req, res) {
-  const { pasteId } = req.params;
-  const foundPaste = pastes.find((paste) => paste.id === Number(pasteId));
-  res.json({ data: foundPaste });
-}
-
 function update(req, res) {
-  const { pasteId } = req.params;
-  const foundPaste = pastes.find((paste) => paste.id === Number(pasteId));
+  const paste = res.locals.paste;
   const { data: { name, syntax, expiration, exposure, text } = {} } = req.body;
 
-  // update the paste
-  foundPaste.name = name;
-  foundPaste.syntax = syntax;
-  foundPaste.expiration = expiration;
-  foundPaste.exposure = exposure;
-  foundPaste.text = text;
+  // Update the paste
+  paste.name = name;
+  paste.syntax = syntax;
+  paste.expiration = expiration;
+  paste.exposure = exposure;
+  paste.text = text;
 
-  res.json({ data: foundPaste });
+  res.json({ data: paste });
+}
+
+function read(req, res, next) {
+  res.json({ data: res.locals.paste });
 }
 
 function destroy(req, res) {
@@ -111,29 +122,29 @@ function destroy(req, res) {
 
 module.exports = {
   create: [
-      bodyDataHas("name"),
-      bodyDataHas("syntax"),
-      bodyDataHas("exposure"),
-      bodyDataHas("expiration"),
-      bodyDataHas("text"),
-      exposurePropertyIsValid,
-      syntaxPropertyIsValid,
-      expirationIsValidNumber,
-      create
+    bodyDataHas("name"),
+    bodyDataHas("syntax"),
+    bodyDataHas("exposure"),
+    bodyDataHas("expiration"),
+    bodyDataHas("text"),
+    exposurePropertyIsValid,
+    syntaxPropertyIsValid,
+    expirationIsValidNumber,
+    create,
   ],
   list,
   read: [pasteExists, read],
   update: [
-      pasteExists,
-      bodyDataHas("name"),
-      bodyDataHas("syntax"),
-      bodyDataHas("exposure"),
-      bodyDataHas("expiration"),
-      bodyDataHas("text"),
-      exposurePropertyIsValid,
-      syntaxPropertyIsValid,
-      expirationIsValidNumber,
-      update
+    pasteExists,
+    bodyDataHas("name"),
+    bodyDataHas("syntax"),
+    bodyDataHas("exposure"),
+    bodyDataHas("expiration"),
+    bodyDataHas("text"),
+    exposurePropertyIsValid,
+    syntaxPropertyIsValid,
+    expirationIsValidNumber,
+    update,
   ],
   delete: [pasteExists, destroy],
 };
